@@ -356,7 +356,7 @@ function exportPublicData(){
   count:rawRows.length,
   rows:rawRows.map(publicRow)
  };
- const blob=new Blob([JSON.stringify(payload,null,2)],{type:"application/json;charset=utf-8"});
+ const blob=new Blob([JSON.stringify(payload)],{type:"application/json;charset=utf-8"});
  const url=URL.createObjectURL(blob);
  const a=document.createElement("a");
  a.href=url;a.download="risk_public.json";
