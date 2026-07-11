@@ -138,9 +138,44 @@ function mapSystem(code){
  return"รอตรวจสอบ";
 }
 function fiscalYear(dateStr){
- if(!dateStr)return"ไม่ระบุ";
- let d=new Date(dateStr); if(isNaN(d))return"ไม่ระบุ";
- let y=d.getFullYear()+543; return String(d.getMonth()+1>=10?y+1:y);
+  if(!dateStr) return "ไม่ระบุ";
+
+  const text = String(dateStr).trim();
+  let day, month, year;
+
+  // รูปแบบ dd/mm/yyyy หรือ dd-mm-yyyy
+  let match = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+
+  if(match){
+    day = Number(match[1]);
+    month = Number(match[2]);
+    year = Number(match[3]);
+  }else{
+    // รูปแบบ yyyy-mm-dd
+    match = text.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})$/);
+
+    if(match){
+      year = Number(match[1]);
+      month = Number(match[2]);
+      day = Number(match[3]);
+    }else{
+      const d = new Date(text);
+
+      if(isNaN(d.getTime())) return "ไม่ระบุ";
+
+      day = d.getDate();
+      month = d.getMonth() + 1;
+      year = d.getFullYear();
+    }
+  }
+
+  // เปลี่ยน ค.ศ. เป็น พ.ศ.
+  if(year < 2400){
+    year += 543;
+  }
+
+  // ตุลาคม–ธันวาคม เป็นปีงบประมาณถัดไป
+  return String(month >= 10 ? year + 1 : year);
 }
 function normalize(row){
  const incident=val(row,["รหัส: เรื่องอุบัติการณ์","รหัสอุบัติการณ์","Incident"]);
@@ -149,7 +184,7 @@ function normalize(row){
  const date=val(row,["วันที่เกิดอุบัติการณ์","วันที่เกิดเหตุ","Date"]);
  const system=val(row,["ระบบหลัก","Main System"])||mapSystem(code);
  return {
-  year:val(row,["ปี","ปีงบประมาณ","Fiscal Year"])||fiscalYear(date),
+  year:val(row,["ปีงบประมาณ","Fiscal Year"])||fiscalYear(date),
   reportId:val(row,["รหัสรายงานอุบัติการณ์","เลขที่รายงาน","Report ID"]),
   code, incident, system, severity,
   coSystem:val(row,["ระบบร่วม","Co-System"]),
