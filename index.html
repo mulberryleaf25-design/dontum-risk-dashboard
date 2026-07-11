@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Risk Dashboard โรงพยาบาลดอนตูม — Public Read-only</title>
+  <link rel="preconnect" href="https://cdn.jsdelivr.net">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+  <style>
+    :root{
+      --navy:#12324a;--teal:#177e89;--light:#f4f7fa;--white:#fff;
+      --text:#21313c;--muted:#667985;--border:#dce5eb;--danger:#b42318;
+    }
+    *{box-sizing:border-box} body{margin:0;font-family:"Tahoma","Noto Sans Thai",Arial,sans-serif;background:var(--light);color:var(--text)}
+    header{background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff;padding:22px 28px}
+    header h1{margin:0 0 5px;font-size:1.65rem} header p{margin:0;opacity:.9}
+    .wrap{max-width:1500px;margin:auto;padding:20px}
+    .toolbar,.card{background:#fff;border:1px solid var(--border);border-radius:14px;box-shadow:0 3px 14px rgba(18,50,74,.06)}
+    .toolbar{padding:15px;margin-bottom:16px;display:flex;flex-wrap:wrap;gap:10px;align-items:end}
+    label{font-size:.82rem;color:var(--muted);display:block;margin-bottom:5px}
+    select,input,button{border:1px solid #cbd8df;border-radius:9px;padding:10px 11px;font:inherit;background:#fff}
+    button{cursor:pointer;background:var(--navy);color:#fff;border:none;font-weight:700}
+    button.secondary{background:#fff;color:var(--navy);border:1px solid var(--navy)}
+    .filebox{position:relative;overflow:hidden;display:inline-block}
+    .filebox input{position:absolute;left:0;top:0;opacity:0;width:100%;height:100%;cursor:pointer}
+    .grid-kpi{display:grid;grid-template-columns:repeat(5,minmax(150px,1fr));gap:14px;margin-bottom:16px}
+    .kpi{padding:17px}.kpi .value{font-size:1.8rem;font-weight:800;color:var(--navy)}.kpi .caption{color:var(--muted);margin-top:4px}
+    .grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}
+    .card{padding:18px;min-width:0}.card h2{font-size:1.05rem;margin:0 0 14px}
+    .chartbox{height:330px}.chartbox canvas{max-height:330px}
+    .table-wrap{overflow:auto;max-height:520px;border:1px solid var(--border);border-radius:10px}
+    table{border-collapse:collapse;width:100%;font-size:.86rem;background:#fff}
+    th,td{padding:10px;border-bottom:1px solid #e7edf1;text-align:left;vertical-align:top}
+    th{position:sticky;top:0;background:#edf4f7;color:var(--navy);z-index:1;white-space:nowrap}
+    tr:hover td{background:#f8fbfc}
+    .badge{display:inline-block;padding:3px 8px;border-radius:999px;background:#e8f3f4;color:#11616a;font-weight:700;font-size:.75rem}
+    .badge.high{background:#feeceb;color:var(--danger)}
+    .status{padding:9px 12px;background:#eaf5ee;border-radius:9px;color:#27623d;font-size:.86rem;flex:1;min-width:260px}
+    .note{font-size:.84rem;color:var(--muted);line-height:1.55}
+    .detail-btn{padding:7px 10px;border-radius:8px;font-size:.78rem;white-space:nowrap}
+    .modal{display:none;position:fixed;inset:0;z-index:1000;background:rgba(13,35,50,.62);padding:24px;overflow:auto}
+    .modal.open{display:flex;align-items:flex-start;justify-content:center}
+    .modal-panel{width:min(1050px,100%);max-height:calc(100vh - 48px);overflow:auto;background:#fff;border-radius:16px;box-shadow:0 24px 70px rgba(0,0,0,.25)}
+    .modal-head{position:sticky;top:0;z-index:3;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:18px 20px;background:linear-gradient(135deg,var(--navy),var(--teal));color:#fff}
+    .modal-head h2{margin:0 0 4px;font-size:1.18rem}.modal-sub{font-size:.82rem;opacity:.88}
+    .modal-close{background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.55);font-size:1.1rem;padding:6px 11px}
+    .modal-body{padding:20px}
+    .detail-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+    .detail-item{border:1px solid var(--border);border-radius:10px;padding:11px;background:#f9fbfc;min-width:0}
+    .detail-item .name{font-size:.75rem;color:var(--muted);margin-bottom:5px}.detail-item .data{font-weight:700;overflow-wrap:anywhere}
+    .detail-section{margin:18px 0}.detail-section h3{font-size:.95rem;color:var(--navy);margin:0 0 8px}
+    .detail-text{white-space:pre-wrap;line-height:1.65;border:1px solid var(--border);border-radius:10px;padding:12px;background:#fff;overflow-wrap:anywhere}
+    .raw-detail{width:100%;table-layout:fixed}.raw-detail th{position:static;width:31%;background:#edf4f7}.raw-detail td{overflow-wrap:anywhere;white-space:pre-wrap}
+    body.modal-open{overflow:hidden}
+    footer{text-align:center;color:var(--muted);font-size:.8rem;padding:10px 0 28px}
+    @media(max-width:1000px){.grid-kpi{grid-template-columns:repeat(2,1fr)}.grid{grid-template-columns:1fr}}
+    @media(max-width:760px){.detail-summary{grid-template-columns:repeat(2,minmax(0,1fr))}.modal{padding:8px}.modal-panel{max-height:calc(100vh - 16px)}}
+    @media(max-width:560px){header{padding:18px}.wrap{padding:10px}.grid-kpi{grid-template-columns:1fr}.detail-summary{grid-template-columns:1fr}.modal-body{padding:12px}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>ระบบ Dashboard ความเสี่ยง โรงพยาบาลดอนตูม</h1>
+  <p>Public Read-only • ค้นหาและดูรายละเอียดอุบัติการณ์ที่ผ่านการปกปิดข้อมูลส่วนบุคคล</p>
+</header>
+
+<main class="wrap">
+  <section class="toolbar">
+    <div><label>ปีงบประมาณ</label><select id="yearFilter"><option value="ALL">ทุกปี</option></select></div>
+    <div><label>ระบบหลัก</label><select id="systemFilter"><option value="ALL">ทุกระบบ</option></select></div>
+    <div><label>ระดับความรุนแรง</label><select id="severityFilter"><option value="ALL">ทุกระดับ</option></select></div>
+    <div style="flex:1;min-width:220px"><label>ค้นหา</label><input id="searchBox" style="width:100%" placeholder="รหัสอุบัติการณ์ / หน่วยงาน / Keyword / รายละเอียด"></div>
+    <div class="status" id="publicMode">โหมดดูอย่างเดียว — ไม่สามารถนำเข้า แก้ไข หรือลบข้อมูลได้</div>
+    <div class="status" id="status">กำลังโหลดข้อมูลอุบัติการณ์สำหรับเผยแพร่…</div>
+  </section>
+
+  <section class="grid-kpi">
+    <div class="card kpi"><div class="value" id="kpiTotal">0</div><div class="caption">อุบัติการณ์ทั้งหมด</div></div>
+    <div class="card kpi"><div class="value" id="kpiCodes">0</div><div class="caption">รหัสอุบัติการณ์ไม่ซ้ำ</div></div>
+    <div class="card kpi"><div class="value" id="kpiHigh">0</div><div class="caption">ระดับรุนแรงสูง</div></div>
+    <div class="card kpi"><div class="value" id="kpiOpen">–</div><div class="caption">เคสที่ยังไม่ปิด</div></div>
+    <div class="card kpi"><div class="value" id="kpiTop">–</div><div class="caption">ระบบที่พบสูงสุด</div></div>
+  </section>
+
+  <section class="grid">
+    <div class="card"><h2>แนวโน้มอุบัติการณ์รายปี</h2><div class="chartbox"><canvas id="yearChart"></canvas></div></div>
+    <div class="card"><h2>จำนวนแยกตามระบบหลัก</h2><div class="chartbox"><canvas id="systemChart"></canvas></div></div>
+    <div class="card"><h2>ระดับความรุนแรง</h2><div class="chartbox"><canvas id="severityChart"></canvas></div></div>
+    <div class="card"><h2>Top 10 รหัส/เรื่องความเสี่ยง</h2><div class="chartbox"><canvas id="topChart"></canvas></div></div>
+  </section>
+
+  <section class="card" style="margin-bottom:16px">
+    <h2>รายการอุบัติการณ์</h2>
+    <p class="note">กด <b>ดูรายละเอียด</b> เพื่อเปิดข้อมูลของแต่ละอุบัติการณ์ ข้อมูลในหน้านี้เป็นชุดอ่านอย่างเดียวและต้องผ่านการปกปิดข้อมูลระบุตัวบุคคลก่อนเผยแพร่</p>
+    <div class="table-wrap"><table id="riskTable"><thead></thead><tbody></tbody></table></div>
+  </section>
+</main>
+
+<div class="modal" id="detailModal" aria-hidden="true">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="detailTitle">
+    <div class="modal-head">
+      <div>
+        <h2 id="detailTitle">รายละเอียดอุบัติการณ์</h2>
+        <div class="modal-sub" id="detailSubtitle"></div>
+      </div>
+      <button class="modal-close" id="detailClose" aria-label="ปิด">✕</button>
+    </div>
+    <div class="modal-body" id="detailBody"></div>
+  </div>
+</div>
+<footer>Public Read-only • ไม่มีเครื่องมือเพิ่ม แก้ไข หรือลบข้อมูล • รายละเอียดที่เผยแพร่ต้องไม่สามารถระบุตัวผู้ป่วยหรือบุคลากรได้</footer>
+
+<script>
+const SUMMARY = [
+ {year:"2566",system:"PCT",count:261,high:22},{year:"2566",system:"PTC",count:385,high:2},{year:"2566",system:"RM",count:301,high:12},{year:"2566",system:"IC",count:35,high:3},{year:"2566",system:"ENV",count:473,high:21},{year:"2566",system:"IM",count:287,high:2},
+ {year:"2567",system:"PCT",count:243,high:9},{year:"2567",system:"PTC",count:420,high:6},{year:"2567",system:"RM",count:456,high:9},{year:"2567",system:"IC",count:17,high:0},{year:"2567",system:"ENV",count:568,high:13},{year:"2567",system:"IM",count:431,high:1},
+ {year:"2568",system:"PCT",count:231,high:4},{year:"2568",system:"PTC",count:429,high:1},{year:"2568",system:"RM",count:526,high:3},{year:"2568",system:"IC",count:28,high:0},{year:"2568",system:"ENV",count:695,high:7},{year:"2568",system:"IM",count:564,high:1},
+ {year:"2569",system:"PCT",count:180,high:9},{year:"2569",system:"PTC",count:278,high:0},{year:"2569",system:"RM",count:296,high:1},{year:"2569",system:"IC",count:21,high:0},{year:"2569",system:"ENV",count:454,high:4},{year:"2569",system:"IM",count:398,high:1}
+];
+const TOTALS={2566:{count:1742,codes:112,high:62},2567:{count:2135,codes:79,high:38},2568:{count:2473,codes:72,high:16},2569:{count:1627,codes:82,high:15}};
+const SYSTEMS=["PCT","PTC","RM","IC","ENV","IM"];
+let rawRows=[], visibleRows=[], charts={};
+
+const $=id=>document.getElementById(id);
+function val(row,names){for(const n of names){if(row[n]!==undefined && row[n]!==null && String(row[n]).trim()!=="")return String(row[n]).trim()}return""}
+function extractCode(text){const m=String(text||"").match(/\b([A-Z]{2,4}\d{3})\b/i);return m?m[1].toUpperCase():""}
+function mapSystem(code){
+ code=(code||"").toUpperCase();
+ if(code.startsWith("CPM"))return"PTC";
+ if(code.startsWith("CPI"))return"IC";
+ if(code.startsWith("GPL"))return"IM";
+ if(["GOS","GPE","GPS","GPI"].some(x=>code.startsWith(x)))return"ENV";
+ if(code.startsWith("CPP")||code.startsWith("CPL")||code.startsWith("CPE")||code.startsWith("CPS")||code.startsWith("CSM"))return"PCT";
+ if(code.startsWith("GO")||code.startsWith("GR")||code.startsWith("GF"))return"RM";
+ return"รอตรวจสอบ";
+}
+function fiscalYear(dateStr){
+ if(!dateStr)return"ไม่ระบุ";
+ let d=new Date(dateStr); if(isNaN(d))return"ไม่ระบุ";
+ let y=d.getFullYear()+543; return String(d.getMonth()+1>=10?y+1:y);
+}
+function normalize(row){
+ const incident=val(row,["รหัส: เรื่องอุบัติการณ์","รหัสอุบัติการณ์","Incident"]);
+ const code=extractCode(incident)||val(row,["รหัส","Code"]);
+ const severity=val(row,["ความรุนแรง","ระดับความรุนแรง","Severity"]).toUpperCase();
+ const date=val(row,["วันที่เกิดอุบัติการณ์","วันที่เกิดเหตุ","Date"]);
+ const system=val(row,["ระบบหลัก","Main System"])||mapSystem(code);
+ return {
+  year:val(row,["ปี","ปีงบประมาณ","Fiscal Year"])||fiscalYear(date),
+  reportId:val(row,["รหัสรายงานอุบัติการณ์","เลขที่รายงาน","Report ID"]),
+  code, incident, system, severity,
+  coSystem:val(row,["ระบบร่วม","Co-System"]),
+  unit:val(row,["หน่วยงานที่บันทึกรายงาน","กลุ่ม/หน่วยงานหลัก","หน่วยงาน"]),
+  subUnit:val(row,["หน่วยงานย่อย","Sub Unit"]),
+  location:val(row,["สถานที่เกิดเหตุ","ชนิดสถานที่"]),
+  affected:val(row,["ผู้ได้รับผลกระทบ","ผู้ได้รับผลกระทบจากอุบัติการณ์"]),
+  summary:val(row,["สรุปประเด็นปัญหา","เรื่องย่อย","Keyword"]),
+  detail:val(row,["รายละเอียดการเกิด","รายละเอียด"]),
+  initialAction:val(row,["การแก้ไขเบื้องต้น","การแก้ไขเบื้องต้น (ถ้ามี)"]),
+  correctiveAction:val(row,["การแก้ไขป้องกัน","การแก้ไข/ป้องกัน","มาตรการแก้ไข"]),
+  outcome:val(row,["ผลลัพธ์","ผลการดำเนินการ"]),
+  review:val(row,["การทบทวน","ผลการทบทวน"]),
+  status:val(row,["สถานะ","Status"]),
+  date,
+  _raw:row
+ };
+}
+function highSeverity(s){return ["E","F","G","H","I","3","4","5"].includes(String(s).toUpperCase())}
+function filteredRows(){
+ const y=$("yearFilter").value,s=$("systemFilter").value,sev=$("severityFilter").value,q=$("searchBox").value.trim().toLowerCase();
+ return rawRows.filter(r=>{
+  const searchText=Object.entries(r).filter(([k])=>k!=="_raw").map(([,v])=>v).join(" ")+" "+Object.values(r._raw||{}).join(" ");
+  return (y==="ALL"||r.year===y)&&(s==="ALL"||r.system===s)&&(sev==="ALL"||r.severity===sev)&&(!q||searchText.toLowerCase().includes(q));
+ });
+}
+function destroyChart(k){if(charts[k])charts[k].destroy()}
+function chart(id,type,labels,data,label){
+ destroyChart(id); charts[id]=new Chart($(id),{type,data:{labels,datasets:[{label,data,borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:type!=="bar"||id==="yearChart"}},scales:type==="doughnut"?{}:{y:{beginAtZero:true}}}});
+}
+function renderSummary(){
+ const yf=$("yearFilter").value,sf=$("systemFilter").value;
+ const rows=SUMMARY.filter(x=>(yf==="ALL"||x.year===yf)&&(sf==="ALL"||x.system===sf));
+ const total=rows.reduce((a,b)=>a+b.count,0), high=rows.reduce((a,b)=>a+b.high,0);
+ const codes=yf==="ALL"?Object.values(TOTALS).reduce((a,b)=>a+b.codes,0):(TOTALS[yf]?.codes||0);
+ const systemTotals={};rows.forEach(x=>systemTotals[x.system]=(systemTotals[x.system]||0)+x.count);
+ const top=Object.entries(systemTotals).sort((a,b)=>b[1]-a[1])[0];
+ $("kpiTotal").textContent=total.toLocaleString("th-TH");$("kpiCodes").textContent=codes.toLocaleString("th-TH");$("kpiHigh").textContent=high.toLocaleString("th-TH");$("kpiOpen").textContent="–";$("kpiTop").textContent=top?top[0]:"–";
+ const years=[...new Set(rows.map(x=>x.year))].sort();chart("yearChart","bar",years,years.map(y=>rows.filter(x=>x.year===y).reduce((a,b)=>a+b.count,0)),"จำนวน");
+ chart("systemChart","bar",SYSTEMS,SYSTEMS.map(s=>rows.filter(x=>x.system===s).reduce((a,b)=>a+b.count,0)),"จำนวน");
+ chart("severityChart","doughnut",["รุนแรงสูง","ระดับอื่น"],[high,Math.max(0,total-high)],"จำนวน");
+ chart("topChart","bar",Object.keys(systemTotals),Object.values(systemTotals),"จำนวน");
+ renderTable([]);
+}
+function renderDetailed(){
+ const rows=filteredRows();
+ const codes=new Set(rows.map(r=>r.code).filter(Boolean));
+ const high=rows.filter(r=>highSeverity(r.severity)).length;
+ const open=rows.filter(r=>!/(ปิด|แก้ไขได้|สิ้นสุด)/.test(r.status)).length;
+ const sys={};rows.forEach(r=>sys[r.system]=(sys[r.system]||0)+1);const top=Object.entries(sys).sort((a,b)=>b[1]-a[1])[0];
+ $("kpiTotal").textContent=rows.length.toLocaleString("th-TH");$("kpiCodes").textContent=codes.size.toLocaleString("th-TH");$("kpiHigh").textContent=high.toLocaleString("th-TH");$("kpiOpen").textContent=open.toLocaleString("th-TH");$("kpiTop").textContent=top?top[0]:"–";
+ const years=[...new Set(rows.map(r=>r.year))].sort();chart("yearChart","bar",years,years.map(y=>rows.filter(r=>r.year===y).length),"จำนวน");
+ const systems=[...new Set(rows.map(r=>r.system))].sort();chart("systemChart","bar",systems,systems.map(s=>rows.filter(r=>r.system===s).length),"จำนวน");
+ const sevs=[...new Set(rows.map(r=>r.severity||"ไม่ระบุ"))].sort();chart("severityChart","doughnut",sevs,sevs.map(s=>rows.filter(r=>(r.severity||"ไม่ระบุ")===s).length),"จำนวน");
+ const freq={};rows.forEach(r=>{const k=r.code||r.incident||"ไม่ระบุ";freq[k]=(freq[k]||0)+1});const top10=Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+ chart("topChart","bar",top10.map(x=>x[0]),top10.map(x=>x[1]),"จำนวน");renderTable(rows);
+}
+function renderTable(rows){
+ const head=$("riskTable").querySelector("thead"),body=$("riskTable").querySelector("tbody");
+ visibleRows=rows.slice(0,1000);
+ if(!rows.length){head.innerHTML="<tr><th>สถานะข้อมูล</th></tr>";body.innerHTML='<tr><td>อัปโหลดไฟล์ Excel เพื่อเรียกดูรายละเอียดรายเหตุการณ์ หรือใช้ Dashboard สรุปที่แสดงอยู่ด้านบน</td></tr>';return}
+ head.innerHTML="<tr><th>ปี</th><th>วันที่</th><th>รหัส</th><th>ระบบ</th><th>ระดับ</th><th>หน่วยงาน</th><th>เรื่อง/สรุป</th><th>สถานะ</th><th>รายละเอียด</th></tr>";
+ body.innerHTML=visibleRows.map((r,i)=>`<tr><td>${esc(r.year)}</td><td>${esc(r.date)}</td><td><span class="badge">${esc(r.code)}</span></td><td>${esc(r.system)}</td><td><span class="badge ${highSeverity(r.severity)?"high":""}">${esc(r.severity||"-")}</span></td><td>${esc(r.unit)}</td><td><b>${esc(r.incident)}</b><br>${esc(r.summary||r.detail).slice(0,280)}</td><td>${esc(r.status)}</td><td><button class="detail-btn" data-detail-index="${i}">ดูรายละเอียด</button></td></tr>`).join("");
+}
+function detailBlock(title,value){
+ if(!String(value||"").trim())return"";
+ return `<section class="detail-section"><h3>${esc(title)}</h3><div class="detail-text">${esc(value)}</div></section>`;
+}
+function showDetail(index){
+ const r=visibleRows[index];if(!r)return;
+ $("detailTitle").textContent=r.incident||r.code||"รายละเอียดอุบัติการณ์";
+ $("detailSubtitle").textContent=`รหัสรายงาน ${r.reportId||"-"} • ปีงบประมาณ ${r.year||"-"}`;
+ const rawEntries=Object.entries(r._raw||{}).filter(([,v])=>String(v??"").trim()!=="");
+ const rawTable=rawEntries.length?`<section class="detail-section"><h3>ข้อมูลต้นฉบับทุกช่องจาก Excel</h3><div class="table-wrap" style="max-height:none"><table class="raw-detail"><tbody>${rawEntries.map(([k,v])=>`<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join("")}</tbody></table></div></section>`:"";
+ $("detailBody").innerHTML=`
+  <div class="detail-summary">
+   <div class="detail-item"><div class="name">รหัสรายงาน</div><div class="data">${esc(r.reportId||"-")}</div></div>
+   <div class="detail-item"><div class="name">รหัสอุบัติการณ์</div><div class="data">${esc(r.code||"-")}</div></div>
+   <div class="detail-item"><div class="name">วันที่เกิดเหตุ</div><div class="data">${esc(r.date||"-")}</div></div>
+   <div class="detail-item"><div class="name">ปีงบประมาณ</div><div class="data">${esc(r.year||"-")}</div></div>
+   <div class="detail-item"><div class="name">ระบบหลัก / ระบบร่วม</div><div class="data">${esc(r.system||"-")} ${r.coSystem?"/ "+esc(r.coSystem):""}</div></div>
+   <div class="detail-item"><div class="name">ระดับความรุนแรง</div><div class="data"><span class="badge ${highSeverity(r.severity)?"high":""}">${esc(r.severity||"-")}</span></div></div>
+   <div class="detail-item"><div class="name">หน่วยงาน</div><div class="data">${esc(r.unit||"-")} ${r.subUnit?"/ "+esc(r.subUnit):""}</div></div>
+   <div class="detail-item"><div class="name">สถานที่เกิดเหตุ</div><div class="data">${esc(r.location||"-")}</div></div>
+   <div class="detail-item"><div class="name">ผู้ได้รับผลกระทบ</div><div class="data">${esc(r.affected||"-")}</div></div>
+   <div class="detail-item"><div class="name">สถานะ</div><div class="data">${esc(r.status||"-")}</div></div>
+  </div>
+  ${detailBlock("สรุปประเด็นปัญหา",r.summary)}
+  ${detailBlock("รายละเอียดการเกิดอุบัติการณ์",r.detail)}
+  ${detailBlock("การแก้ไขเบื้องต้น",r.initialAction)}
+  ${detailBlock("การแก้ไขและป้องกัน",r.correctiveAction)}
+  ${detailBlock("ผลลัพธ์การดำเนินการ",r.outcome)}
+  ${detailBlock("ผลการทบทวน",r.review)}
+  ${rawTable}`;
+ $("detailModal").classList.add("open");$("detailModal").setAttribute("aria-hidden","false");document.body.classList.add("modal-open");$("detailClose").focus();
+}
+function closeDetail(){
+ $("detailModal").classList.remove("open");$("detailModal").setAttribute("aria-hidden","true");document.body.classList.remove("modal-open");
+}
+function esc(s){return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+function fillFilters(){
+ const years=rawRows.length?[...new Set(rawRows.map(r=>r.year))].sort():["2566","2567","2568","2569"];
+ $("yearFilter").innerHTML='<option value="ALL">ทุกปี</option>'+years.map(x=>`<option>${esc(x)}</option>`).join("");
+ const systems=rawRows.length?[...new Set(rawRows.map(r=>r.system))].sort():SYSTEMS;
+ $("systemFilter").innerHTML='<option value="ALL">ทุกระบบ</option>'+systems.map(x=>`<option>${esc(x)}</option>`).join("");
+ const sevs=rawRows.length?[...new Set(rawRows.map(r=>r.severity).filter(Boolean))].sort():["A","B","C","D","E","F","G","H","I","1","2","3","4","5"];
+ $("severityFilter").innerHTML='<option value="ALL">ทุกระดับ</option>'+sevs.map(x=>`<option>${esc(x)}</option>`).join("");
+}
+
+$("riskTable").addEventListener("click",e=>{
+ const btn=e.target.closest("[data-detail-index]");if(btn)showDetail(Number(btn.dataset.detailIndex));
+});
+$("detailClose").addEventListener("click",closeDetail);
+$("detailModal").addEventListener("click",e=>{if(e.target===$("detailModal"))closeDetail()});
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&$("detailModal").classList.contains("open"))closeDetail()});
+
+["yearFilter","systemFilter","severityFilter"].forEach(id=>$(id).addEventListener("change",()=>rawRows.length?renderDetailed():renderSummary()));
+$("searchBox").addEventListener("input",()=>rawRows.length&&renderDetailed());
+async function loadPublicData(){
+ try{
+  const response=await fetch("risk_public.json?ts="+Date.now(),{cache:"no-store"});
+  if(!response.ok)throw new Error("ไม่พบไฟล์ risk_public.json");
+  const payload=await response.json();
+  const rows=Array.isArray(payload)?payload:(payload.rows||[]);
+  rawRows=rows.map(r=>({...r,_raw:{}}));
+  fillFilters();
+  if(rawRows.length){
+   $("status").textContent=`แสดงข้อมูลอ่านอย่างเดียว ${rawRows.length.toLocaleString("th-TH")} รายการ • อัปเดต ${payload.generatedAt?new Date(payload.generatedAt).toLocaleString("th-TH"):"ไม่ระบุ"}`;
+   renderDetailed();
+  }else{
+   $("status").textContent="ยังไม่มีข้อมูลรายเคสสำหรับเผยแพร่";
+   renderSummary();
+  }
+ }catch(err){
+  rawRows=[];fillFilters();renderSummary();
+  $("status").textContent="ยังไม่ได้อัปโหลด risk_public.json — ขณะนี้แสดงเฉพาะข้อมูลสรุป";
+ }
+}
+fillFilters();loadPublicData();
+</script>
+</body>
+</html>
